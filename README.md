@@ -35,6 +35,14 @@ BMS-ESP32-Communication/
 - VESC motor controller
 - 11x 1kΩ resistors (battery simulation)
 - DC power supply
+    ### Circuit with resistors
+
+<div align="center">
+
+  <img src="hardware/schematics/Schaltung.png" alt="Circuit Schematic" width="600">
+
+<img src="hardware/schematics/Gesamtschaltung.png" alt="Circuit Schematic" width="600">
+</div>
 
 ## Quick Start
 
