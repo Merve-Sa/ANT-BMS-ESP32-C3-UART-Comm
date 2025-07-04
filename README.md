@@ -83,11 +83,11 @@ Create an issue on GitHub
 Contact: [msaglam@rptu.de]
 
 
-Acknowledgments
+## Acknowledgments
 
 Rheinland-Pfälzische Technische Universität Kaiserslautern-Landau
-Supervisor: Prof. Dr.-Ing. Stefan Götz
-Advisor: Dipl. Ing. Max Köhler
+- Supervisor: Prof. Dr.-Ing. Stefan Götz
+- Advisor: Dipl. Ing. Max Köhler
 ## License
 
 MIT License
