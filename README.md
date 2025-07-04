@@ -39,8 +39,6 @@ BMS-ESP32-Communication/
 
 <div align="center">
 
-  <img src="hardware/schematics/Schaltung.png" alt="Circuit Schematic" width="600">
-
 <img src="hardware/schematics/Gesamtschaltung.png" alt="Circuit Schematic" width="600">
 </div>
 
