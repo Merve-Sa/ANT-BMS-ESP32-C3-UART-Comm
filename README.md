@@ -45,7 +45,7 @@ BMS-ESP32-Communication/
 ## Quick Start
 
 ```bash
-git clone https://github.com/yourusername/BMS-ESP32-Communication.git
+git clone https://github.com/Merve-Sa/BMS-ESP32-Communication.git
 cd BMS-ESP32-Communication/firmware
 pio run --target upload
 ```
