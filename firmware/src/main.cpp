@@ -15,44 +15,50 @@
 // AntBMS Protocol Constants
 // =============================================================================
 namespace AntBMSProtocol {
-  // Frame bytes
+  // START- und ENDBYTES
   const uint8_t START1 = 0x7E;
   const uint8_t START2 = 0xA1; 
   const uint8_t END1 = 0xAA;
   const uint8_t END2 = 0x55;
   
-  // Function codes
+  // Functioncodes
   const uint8_t STATE = 0x01;
   const uint8_t PARAM_READ = 0x02;
   const uint8_t PARAM_SET = 0x22;
   const uint8_t CONTROL_SET = 0x51;
   
-  // Register address STATE
+  // Registeradresse STATE
   const uint16_t ADR_STATE = 0x0000;
   
-  // Register addresses PARAMETERCONFIG
+  // Registeradresse PARAMETERCONFIG
   const uint16_t ADR_PARAM_VOLT = 0x0000;
   const uint16_t ADR_PARAM_TEMP = 0x0038;
   const uint16_t ADR_PARAM_CURRENT = 0x0068;
   const uint16_t ADR_PARAM_BALANCE = 0x008C;
 
   
-  // Register addresses CONTROL SET
+  // Registeradresse CONTROL SET
   const uint16_t ADR_CON_CHG_MOS_ON = 0x0006;
   const uint16_t ADR_CON_CHG_MOS_OFF = 0x0004;
   const uint16_t ADR_CON_DIS_MOS_ON = 0x0003;
   const uint16_t ADR_CON_DIS_MOS_OFF = 0x0001;
 
-  // Register address to set the Cell number
+
+  // Adresse um die Zellanzahl zu setten
   const uint16_t ADR_CELL_NUM = 0x009A;
   
-  // Adresse für SaveApply
+  // Registeradresse für SaveApply
   const uint16_t ADR_CON_SAVE = 0x0007;
 
-  // Adresse für FactoryReset
+  // Registeradresse für FactoryReset
   const uint16_t ADR_F_RESET = 0x000C;
 
-  // Data lengths
+
+  // Registeradresse für Balance ON und OFF
+  const uint16_t ADR_BAL_ON = 0x000D;
+  const uint16_t ADR_BAL_OFF = 0x000E;
+
+  // Datenlängen
   const uint8_t LENGTH_STATE = 0xBE;
   const uint8_t LENGTH_PARAM_VOLT = 0x34;
   const uint8_t LENGTH_PARAM_TEMP = 0x2C;
@@ -60,7 +66,8 @@ namespace AntBMSProtocol {
   const uint8_t LENGTH_PARAM_BALANCE = 0x0C;
   const uint8_t LENGTH_CONTROL = 0x00;
 
-  // Data length to set the Cell number
+  
+  // Datenlänge um die Zellanzahl zu setten
   const uint8_t LENGTH_CELL_NUM = 0x02;
   
 
@@ -186,6 +193,12 @@ public:
   // SaveApply
   bool SaveApply();
 
+  // AutoBalance ON
+  bool AutoBalON();
+
+  // AutoBalance OFF
+  bool AutoBalOFF();
+
   // Factory Reset
   bool FactoryReset();
 
@@ -209,7 +222,6 @@ public:
   void printAllData() const;
 
   // Anzahl der Zellen setten
-
   void configureBMSCells();
   
   // Safety checks
@@ -276,9 +288,13 @@ private:
   bool parseConfigureBMSCells(const uint8_t* response, int length, uint16_t cell_num);
   
   // Parse SaveApply
-
   bool parseSave(const uint8_t* response, int length);
 
+  // Parse AutoBalanceON
+  bool parseAutoBalON(const uint8_t* response, int length);
+
+  // Parse AutoBalanceOFF
+  bool parseAutoBalOFF(const uint8_t* response, int length);
 
   // Validation methods
   bool validateFrame(const uint8_t* response, int length, int expectedMinLength) const;
@@ -355,6 +371,36 @@ bool AntBMS::FactoryReset() {
   
   bool success = buildAndSendCommand(AntBMSProtocol::CONTROL_SET, 
                                     AntBMSProtocol::ADR_F_RESET, 
+                                    AntBMSProtocol::LENGTH_CONTROL);
+  if (success) {
+    lastReadTime_ = millis();
+  }
+  return success;
+}
+
+// AUTOBALANCE ON 
+bool AntBMS::AutoBalON() {
+  if (!connected_) return false;
+  
+  if (debugMode_) Serial.println("AutoBalance ON...");
+  
+  bool success = buildAndSendCommand(AntBMSProtocol::CONTROL_SET, 
+                                    AntBMSProtocol::ADR_BAL_ON, 
+                                    AntBMSProtocol::LENGTH_CONTROL);
+  if (success) {
+    lastReadTime_ = millis();
+  }
+  return success;
+}
+
+// AUTOBALANCE ON 
+bool AntBMS::AutoBalOFF() {
+  if (!connected_) return false;
+  
+  if (debugMode_) Serial.println("AutoBalance OFF...");
+  
+  bool success = buildAndSendCommand(AntBMSProtocol::CONTROL_SET, 
+                                    AntBMSProtocol::ADR_BAL_OFF, 
                                     AntBMSProtocol::LENGTH_CONTROL);
   if (success) {
     lastReadTime_ = millis();
@@ -585,8 +631,11 @@ bool AntBMS::buildAndSendCommand(uint8_t functionCode, uint16_t address, uint8_t
       } else if (address == AntBMSProtocol::ADR_F_RESET){
         Serial.println("Factory Reset was successful!");
         return true;
+      } else if (address == AntBMSProtocol::ADR_BAL_ON){
+        return parseAutoBalON(response, responseLength);
+      } else if (address == AntBMSProtocol::ADR_BAL_OFF){
+        return parseAutoBalOFF(response, responseLength);
       }
-        
     }
   }
   return false;
@@ -962,7 +1011,7 @@ bool AntBMS::parseSave(const uint8_t* response, int length){
   
   // Check Frame
   if(response[2] == 0x61 && response[5] == 0x02 && response[6] == 0x01 && response[7] == 0x00){
-    Serial.println("Settings saved successfully!");
+    Serial.println("AutoBalance ist eingeschaltet!");
     return true;
   }
   
@@ -970,6 +1019,43 @@ bool AntBMS::parseSave(const uint8_t* response, int length){
   return true;
 }
 
+// Parse für AutoBalance ON
+bool AntBMS::parseAutoBalON(const uint8_t* response, int length){
+  if (!validateFrame(response, length, 12)) return false;
+  
+  if (debugMode_) {
+    Serial.printf("AutoBalanceOFF : Cmd=0x%02X, DataLength=%d\n", 
+                  response[2], response[5]);
+  }
+  
+  // Check Frame
+  if(response[2] == 0x61 && response[5] == 0x02 && response[6] == 0x01 && response[7] == 0x00){
+    Serial.println("AutoBalance ist eingeschaltet!");
+    return true;
+  }
+  
+
+  return true;
+}
+
+// Parse für AutoBalance OFF
+bool AntBMS::parseAutoBalOFF(const uint8_t* response, int length){
+  if (!validateFrame(response, length, 12)) return false;
+  
+  if (debugMode_) {
+    Serial.printf("AutoBalanceOFF : Cmd=0x%02X, DataLength=%d\n", 
+                  response[2], response[5]);
+  }
+  
+  // Check Frame
+  if(response[2] == 0x61 && response[5] == 0x02 && response[6] == 0x01 && response[7] == 0x00){
+    Serial.println("AutoBalance ist ausgeschaltet!");
+    return true;
+  }
+  
+
+  return true;
+}
 
 /**
  * Funktion zur Konfiguration der BMS-Zellanzahl
@@ -1443,7 +1529,29 @@ void loop() {
           bms.configureBMSCells(); 
       }
 
-  }
+  } else if(input == 'b' || 'B'){
+       Serial.println("Soll das Balancing-Zustand geändert werden?");
+       Serial.println("Wenn ja, bitte 'y' eingeben sonstige Eingaben werden nicht berücksichtigt.");
+      
+      char input2 = Serial.read();
+      Serial.print("Eingabe war: ");
+      Serial.println(input2);
+      if(input2 == '0') {
+          
+          // AutoBalance ausschalten
+          bms.AutoBalOFF();
+          delay(500);
+      
+      } else if(input2 == '1'){
+          
+        // AutoBalance einschalten
+          bms.AutoBalON();
+          delay(500);
+      } else{
+        Serial.println("Keine passende Eingabe. Zustand nicht geändert!");
+      }
+
+  } 
 
  
 
