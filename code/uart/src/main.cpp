@@ -1,9 +1,8 @@
 // =============================================================================
-
 // Folgender Code ist für das BMS ANT-BLE24BHUB angefertigt
-
+// Kommunikation zwischen ANT-BMS und ESP32C3 Mini über UART-Protokoll
+// Das BMS ist mit 11 gleichgroßen 1kΩ Widerständen verbunden (simuliert 11 Batteriezellen in Reihenschaltung)
 // =============================================================================
-
 
 #ifndef ANTBMS_H
 #define ANTBMS_H
@@ -21,7 +20,7 @@ namespace AntBMSProtocol {
   const uint8_t END1 = 0xAA;
   const uint8_t END2 = 0x55;
   
-  // Functioncodes
+  // Funktioncodes für verschiedene Operationen
   const uint8_t STATE = 0x01;
   const uint8_t PARAM_READ = 0x02;
   const uint8_t PARAM_SET = 0x22;
@@ -38,10 +37,10 @@ namespace AntBMSProtocol {
 
   
   // Registeradresse CONTROL SET
-  const uint16_t ADR_CON_CHG_MOS_ON = 0x0006;
-  const uint16_t ADR_CON_CHG_MOS_OFF = 0x0004;
-  const uint16_t ADR_CON_DIS_MOS_ON = 0x0003;
-  const uint16_t ADR_CON_DIS_MOS_OFF = 0x0001;
+  const uint16_t ADR_CON_CHG_MOS_ON = 0x0006;     // Lade-MOS einschalten
+  const uint16_t ADR_CON_CHG_MOS_OFF = 0x0004;    // Lade-MOS ausschalten
+  const uint16_t ADR_CON_DIS_MOS_ON = 0x0003;     // Entlade-MOS einschalten
+  const uint16_t ADR_CON_DIS_MOS_OFF = 0x0001;    // Entlade-MOS ausschalten
 
 
   // Adresse um die Zellanzahl zu setten
@@ -50,7 +49,7 @@ namespace AntBMSProtocol {
   // Registeradresse für SaveApply
   const uint16_t ADR_CON_SAVE = 0x0007;
 
-  // Registeradresse für FactoryReset
+  // Registeradresse für FactoryReset (Werkeinstellungen)
   const uint16_t ADR_F_RESET = 0x000C;
 
 
@@ -74,21 +73,22 @@ namespace AntBMSProtocol {
 }
 
 // =============================================================================
-// Data Structures
+// Datenstrukturen für BMS-Informationen
 // =============================================================================
 
+// Struct für BMS-Zustandsdaten 
 struct BMSStateData {
-  // Cell data
+  // Zelldaten
   int numCells = 10;          // Default-Wert
   float cellVoltages[24];     // Default-Datenlänge
   
   float unitMax, unitMin, unitDiff, avgVoltage;
   
-  // Temperatures
+  // Temperaturen
   float temperature_T1, temperature_T2, temperature_T3, temperature_T4;
   float temperature_MOS, temperature_PCB;
   
-  // Pack data
+  // Gesamtbatterie-Daten
   float packVoltage;
   float current;
   uint16_t stateOfCharge;
@@ -96,7 +96,7 @@ struct BMSStateData {
   // Status
   bool balanceStatus, chargeMOS, dischargeMOS;
   
-  // Capacity
+  // Kapazität
   float physicalAH, remainingAH;
   float totalDischargeAH, totalChargeAH;
   
@@ -109,15 +109,16 @@ struct BMSStateData {
   BMSStateData() : valid(false), numCells(0) {}
 };
 
+// Struct für Spannungsschutzparameter
 struct BMSVoltageParams {
-  // Protection parameters
+  // Schutzparameter Spannung
   float cellOVProt, cellOVRec, cellOVProt2, cellOVRec2;
   float packOVProt, packOVRec;
   float cellUVProt, cellUVRec, cellUVProt2, cellUVRec2;
   float packUVProt, packUVRec;
   float cellDiffProt, cellDiffRec;
   
-  // Warning parameters
+  // Warnparameter
   float cellOVWarn, cellOVWarnRec, packOVWarn, packOVWarnRec;
   float cellUVWarn, cellUVWarnRec, packUVWarn, packUVWarnRec;
   float cellDiffWarn, cellDiffWarnRec;
@@ -127,13 +128,14 @@ struct BMSVoltageParams {
   BMSVoltageParams() : valid(false) {}
 };
 
+// Struct für Temperaturschutzparameter
 struct BMSTemperatureParams {
-  // Protection parameters
+  // Schutzparameter
   float chgHTProt, chgHTRec, disCHGHTProt, disCHGHTRec;
   float mosHTProt, mosHTRec;
   float chgLTProt, chgLTRec, disCHGLTProt, disCHGLTRec;
   
-  // Warning parameters
+  // Warnparameter
   float chgHTWarn, chgHTWarnRec, disCHGHTWarn, disCHGHTWarnRec;
   float mosHTWarn, mosHTWarnRec;
   float chgLTWarn, chgLTWarnRec, disCHGLTWarn, disCHGLTWarnRec;
@@ -143,15 +145,16 @@ struct BMSTemperatureParams {
   BMSTemperatureParams() : valid(false) {}
 };
 
+// Struct für Stromschutzparameter
 struct BMSCurrentParams {
-  // Protection parameters
+  // Schutzparameter
   float chgOCProt, disCHGOCProt, disCHGOCProt2, scProt;
   uint16_t chgOCDelay, disCHGOCDelay, disCHGOCDelay2, scDelay;
   
-  // Warning parameters
+  // Warnparameter
   float chgOCWarn, chgOCWarnRec, disCHGOCWarn, disCHGOCWarnRec;
   
-  // SOC parameters
+  // SOC-Parameter 
   uint16_t socLowLV1Warn, socLowLV2Warn;
   
   bool valid;
@@ -159,10 +162,11 @@ struct BMSCurrentParams {
   BMSCurrentParams() : valid(false) {}
 };
 
+// Struct für Balancing-Parameter
 struct BMSBalanceParams {
-  float balLimitV, balStartV;
-  float balDiffOn, balDiffOff;
-  uint16_t balCur, balChgCur;
+  float balLimitV, balStartV;     // Spannugnsgrenzen für Balancing
+  float balDiffOn, balDiffOff;    // Spannungsdifferenz für Ein-/Ausschalten
+  uint16_t balCur, balChgCur;     // Balancing-Strom-Parameter
   
   bool valid;
   
@@ -170,50 +174,45 @@ struct BMSBalanceParams {
 };
 
 // =============================================================================
-// Main AntBMS Class
+// Haupt-AntBMS-Klasse für die Kommunikation
 // =============================================================================
 
 class AntBMS {
 public:
-  // Constructor
+  // Initialisierung der Schnittstelle mit den Pins und Baudrate
   AntBMS(uint8_t rxPin = 20, uint8_t txPin = 21, uint32_t baudRate = 19200);
   
-  // Initialization
+  // Initialisierung und Beendigung der Kommunikation
   bool begin();
   void end();
   
-  // Data reading methods
-  bool readStateData();
-  bool readVoltageParams();
-  bool readTemperatureParams();
-  bool readCurrentParams();
-  bool readBalanceParams();
-  bool readAllParams();
+  // Methoden zum Lesen verschiedener Datentypen
+  bool readStateData();               // Statusinformationen lesen
+  bool readVoltageParams();           // Spannungsparameter lesen
+  bool readTemperatureParams();       // Temperaturparameter lesen
+  bool readCurrentParams();           // Stromparameter lesen
+  bool readBalanceParams();           // Balancing-Parameter lesen
+  bool readAllParams();               // Alle Parameter auf einmal lesen
   
-  // SaveApply
-  bool SaveApply();
 
-  // AutoBalance ON
-  bool AutoBalON();
+  // Steuerung
+  bool SaveApply();                   // SaveApply
+  bool AutoBalON();                   // AutoBalance ON
+  bool AutoBalOFF();                  // AutoBalance OFF
+  bool FactoryReset();                // Factory Reset
 
-  // AutoBalance OFF
-  bool AutoBalOFF();
-
-  // Factory Reset
-  bool FactoryReset();
-
-  // Funktionsdeklaration Steuerung
+  // Funktionsdeklaration MOS-Steuerung
   bool setControl(const char input);
   
   
-  // Data access methods
+  // Methoden für Datenzugriff (nur lesend)
   const BMSStateData& getStateData() const { return stateData_; }
   const BMSVoltageParams& getVoltageParams() const { return voltageParams_; }
   const BMSTemperatureParams& getTemperatureParams() const { return temperatureParams_; }
   const BMSCurrentParams& getCurrentParams() const { return currentParams_; }
   const BMSBalanceParams& getBalanceParams() const { return balanceParams_; }
   
-  // Utility methods
+  // Ausgabemethoden für verschiedene Datentypen
   void printStateData() const;
   void printVoltageParams() const;
   void printTemperatureParams() const;
@@ -221,91 +220,91 @@ public:
   void printBalanceParams() const;
   void printAllData() const;
 
-  // Anzahl der Zellen setten
+  // Anzahl der Zellen konfigurieren
   void configureBMSCells();
   
-  // Safety checks
+  // Sicherheitsprüfungen für Parameter
   bool checkVoltageParamsSafety() const;
   bool checkTemperatureParamsSafety() const;
   bool checkCurrentParamsSafety() const;
   bool checkBalanceParamsSafety() const;
   bool checkAllParamsSafety() const;
   
-  // Configuration
-  void setTimeout(unsigned long timeout) { timeout_ = timeout; }
-  void setDebugMode(bool debug) { debugMode_ = debug; }
+  // Konfigurationsmethoden
+  void setTimeout(unsigned long timeout) { timeout_ = timeout; }      // Timeout setzen
+  void setDebugMode(bool debug) { debugMode_ = debug; }               // Debug-Modus aktivieren
   
   // Status
-  bool isConnected() const { return connected_; }
-  unsigned long getLastReadTime() const { return lastReadTime_; }
+  bool isConnected() const { return connected_; }                     // Verbindungsstatus
+  unsigned long getLastReadTime() const { return lastReadTime_; }     // Letzte Lesezeit
   
 private:
-  // Hardware configuration
-  uint8_t rxPin_, txPin_;
-  uint32_t baudRate_;
-  HardwareSerial* serial_;
-  bool connected_;
-  unsigned long timeout_;
-  bool debugMode_;
-  unsigned long lastReadTime_;
+  // Hardware konfiguration
+  uint8_t rxPin_, txPin_;                 // UART-Pins
+  uint32_t baudRate_;                     // Übertragungsgeschwindigkeit
+  HardwareSerial* serial_;                // Zeiger auf serielle Schnittstelle
+  bool connected_;                        // Verbindungsstatus
+  unsigned long timeout_;                 // Timeout für Antworten
+  bool debugMode_;                        // Debug-Modus aktiviert
+  unsigned long lastReadTime_;            // Zeitstempel der letzten Datenübertragung
   
-  // Data storage
+  // Datenspeicher für BMS-Informationen
   BMSStateData stateData_;
   BMSVoltageParams voltageParams_;
   BMSTemperatureParams temperatureParams_;
   BMSCurrentParams currentParams_;
   BMSBalanceParams balanceParams_;
   
-  // Communication buffers
-  uint8_t rxBuffer_[256];
-  int rxIndex_;
+  // Kommunikationspuffer
+  uint8_t rxBuffer_[256];                 // Empfangspuffer
+  int rxIndex_;                           // Index im Empfangspuffer
   
-  // Private helper methods
-  uint16_t calculateCRC16_TX(const uint8_t* data, int length) const;
-  uint16_t calculateCRC16_RX(const uint8_t* data, int length) const;
-  uint16_t readUint16LE(const uint8_t* data, int offset) const;
-  uint32_t readUint32LE(const uint8_t* data, int offset) const;
-  void printHex(const uint8_t* data, int length) const;
   
+  // Hilfsmethoden für Datenverarbeitung
+  uint16_t calculateCRC16_TX(const uint8_t* data, int length) const;    // CRC für gesendete Daten
+  uint16_t calculateCRC16_RX(const uint8_t* data, int length) const;    // CRC für empfangene Daten
+  uint16_t readUint16LE(const uint8_t* data, int offset) const;         // 16-Bit Wert lesen (Little Endian)
+  uint32_t readUint32LE(const uint8_t* data, int offset) const;         // 32-Bit Wert lesen (Little Endian)
+  void printHex(const uint8_t* data, int length) const;                 // Hexadezimale Ausgabe für Debug
+  
+  // Kommunikationsmethoden
   bool sendCommand(const uint8_t* command, int cmdLength, uint8_t* response, int* respLength);
   bool buildAndSendCommand(uint8_t functionCode, uint16_t address, uint8_t dataLength);
 
-  // Anzahl Zellen setten
-
+  // Zellanzahl-Konfiguration
   bool buildAndSendCommandBMSCell(uint8_t functionCode, uint16_t address, uint8_t dataLength, uint8_t cell_num);
   
-  // Parser methods
+  // Parser-Methoden
   bool parseStateResponse(const uint8_t* response, int length);
   bool parseVoltageParams(const uint8_t* response, int length);
   bool parseTemperatureParams(const uint8_t* response, int length);
   bool parseCurrentParams(const uint8_t* response, int length);
   bool parseBalanceParams(const uint8_t* response, int length);
 
-  // Parse Set
+  // Parser für Steuerung
   bool parseSetConResponse(const uint8_t* response, int length, const char input);
 
-  // Parse ConfigureBMSCells
+  // Parser für Zellanzahl-Konfiguration
   bool parseConfigureBMSCells(const uint8_t* response, int length, uint16_t cell_num);
   
-  // Parse SaveApply
+  // Parser für Einstellungen speichern
   bool parseSave(const uint8_t* response, int length);
 
-  // Parse AutoBalanceON
+  // Parser für Balancing-Steuerung
   bool parseAutoBalON(const uint8_t* response, int length);
-
-  // Parse AutoBalanceOFF
   bool parseAutoBalOFF(const uint8_t* response, int length);
 
-  // Validation methods
+ // Validierungsmethoden für empfangene Daten
   bool validateFrame(const uint8_t* response, int length, int expectedMinLength) const;
   bool validateCRC(const uint8_t* response, int length) const;
   bool validateSetControl(const uint8_t* response, int length) const;
 };
 
 // =============================================================================
-// Implementation
+// Implementierung 
 // =============================================================================
 
+//initialisiert alle Variablen mit Standardwerten
 AntBMS::AntBMS(uint8_t rxPin, uint8_t txPin, uint32_t baudRate)
   : rxPin_(rxPin), txPin_(txPin), baudRate_(baudRate), 
     serial_(nullptr), connected_(false), timeout_(1000), 
@@ -313,6 +312,7 @@ AntBMS::AntBMS(uint8_t rxPin, uint8_t txPin, uint32_t baudRate)
   serial_ = new HardwareSerial(1);
 }
 
+// Initialisierung der seriellen Kommunikation
 bool AntBMS::begin() {
   if (!serial_) return false;
   
@@ -327,6 +327,7 @@ bool AntBMS::begin() {
   return true;
 }
 
+// Beendigung der Kommunikation
 void AntBMS::end() {
   if (serial_) {
     serial_->end();
@@ -334,6 +335,7 @@ void AntBMS::end() {
   }
 }
 
+// Zustandsdaten vom BMS abrufen
 bool AntBMS::readStateData() {
   if (!connected_) return false;
   
@@ -348,7 +350,7 @@ bool AntBMS::readStateData() {
   return success;
 }
 
-// SaveApply
+// Einstellungen speichern
 bool AntBMS::SaveApply() {
   if (!connected_) return false;
   
@@ -363,7 +365,7 @@ bool AntBMS::SaveApply() {
   return success;
 }
 
-// Factory Reset
+// Werksreset durchführen
 bool AntBMS::FactoryReset() {
   if (!connected_) return false;
   
@@ -378,7 +380,7 @@ bool AntBMS::FactoryReset() {
   return success;
 }
 
-// AUTOBALANCE ON 
+// Automatisches Balancing einschalten
 bool AntBMS::AutoBalON() {
   if (!connected_) return false;
   
@@ -393,7 +395,7 @@ bool AntBMS::AutoBalON() {
   return success;
 }
 
-// AUTOBALANCE ON 
+// Automatisches Balancing ausschalten
 bool AntBMS::AutoBalOFF() {
   if (!connected_) return false;
   
@@ -408,7 +410,7 @@ bool AntBMS::AutoBalOFF() {
   return success;
 }
 
-
+// Spannungsparameter lesen
 bool AntBMS::readVoltageParams() {
   if (!connected_) return false;
   
@@ -423,6 +425,7 @@ bool AntBMS::readVoltageParams() {
   return success;
 }
 
+// Temperaturparameter lesen
 bool AntBMS::readTemperatureParams() {
   if (!connected_) return false;
   
@@ -437,6 +440,7 @@ bool AntBMS::readTemperatureParams() {
   return success;
 }
 
+// Stromparameter lesen
 bool AntBMS::readCurrentParams() {
   if (!connected_) return false;
   
@@ -451,6 +455,7 @@ bool AntBMS::readCurrentParams() {
   return success;
 }
 
+// Balancing-Parameter lesen
 bool AntBMS::readBalanceParams() {
   if (!connected_) return false;
   
@@ -465,6 +470,7 @@ bool AntBMS::readBalanceParams() {
   return success;
 }
 
+// Alle Parameter nacheinander lesen
 bool AntBMS::readAllParams() {
   bool success = true;
   success &= readVoltageParams();
@@ -477,6 +483,7 @@ bool AntBMS::readAllParams() {
   return success;
 }
 
+// MOS-Steuerung basierend auf Benutzereingabe
 bool AntBMS::setControl(const char input) {
   if (!connected_) return false;
   
@@ -486,25 +493,25 @@ bool AntBMS::setControl(const char input) {
 
   switch (input)
   {
-  case 'c':
+  case 'c':     // Laden einschalten
     success = buildAndSendCommand(AntBMSProtocol::CONTROL_SET, 
                                     AntBMSProtocol::ADR_CON_CHG_MOS_ON, 
                                     AntBMSProtocol::LENGTH_CONTROL);
     Serial.println("Ladevorgang gestartet.");
     break;
-  case 'x':
+  case 'x':     // Laden ausschalten
     success = buildAndSendCommand(AntBMSProtocol::CONTROL_SET, 
                                     AntBMSProtocol::ADR_CON_CHG_MOS_OFF, 
                                     AntBMSProtocol::LENGTH_CONTROL);
     Serial.println("Ladevorgang gestoppt.");
     break;
-  case 'd':
+  case 'd':     // Entladen einschalten
     success = buildAndSendCommand(AntBMSProtocol::CONTROL_SET, 
                                     AntBMSProtocol::ADR_CON_DIS_MOS_ON, 
                                     AntBMSProtocol::LENGTH_CONTROL);
     Serial.println("Batterie steht für die Nutzung zur Verfügung.");
     break;
-  case 'f':
+  case 'f':     // Entladen ausschalten
     success = buildAndSendCommand(AntBMSProtocol::CONTROL_SET, 
                                     AntBMSProtocol::ADR_CON_DIS_MOS_OFF, 
                                     AntBMSProtocol::LENGTH_CONTROL);
@@ -522,17 +529,19 @@ bool AntBMS::setControl(const char input) {
 }
 
 
-// Helper Methods Implementation
+// Hilfsmethoden-Implementierung
+// CRC16-Berechnung für gesendete Daten
 uint16_t AntBMS::calculateCRC16_TX(const uint8_t* data, int length) const {
-  uint16_t crc = 0xFFFF;
+  uint16_t crc = 0xFFFF;            // Startert
   
   for (int pos = 0; pos < length; pos++) {
-    crc ^= (uint16_t)data[pos];
+    crc ^= (uint16_t)data[pos];     // XOR mit aktuellem Byte
     
+    // 8 Bit-Shifts für CRC-Polynom
     for (int i = 8; i != 0; i--) {
       if ((crc & 0x0001) != 0) {
         crc >>= 1;
-        crc ^= 0xA001;
+        crc ^= 0xA001;      // Modbus-Polynom    
       } else {
         crc >>= 1;
       }
@@ -542,6 +551,7 @@ uint16_t AntBMS::calculateCRC16_TX(const uint8_t* data, int length) const {
   return crc;
 }
 
+// CRC16-Berechnung für empfangene Daten
 uint16_t AntBMS::calculateCRC16_RX(const uint8_t* data, int length) const {
   uint16_t crc = 0xFFFF;
   
@@ -551,7 +561,7 @@ uint16_t AntBMS::calculateCRC16_RX(const uint8_t* data, int length) const {
     for (int i = 8; i != 0; i--) {
       if ((crc & 0x0001) != 0) {
         crc >>= 1;
-        crc ^= 0xA001;
+        crc ^= 0xA001;    
       } else {
         crc >>= 1;
       }
@@ -561,14 +571,18 @@ uint16_t AntBMS::calculateCRC16_RX(const uint8_t* data, int length) const {
   return crc;
 }
 
+// 16-Bit Wert im Little-Endian-Format lesen
 uint16_t AntBMS::readUint16LE(const uint8_t* data, int offset) const {
   return data[offset] | (data[offset + 1] << 8);
 }
 
+// 32-Bit Wert im Little-Endian-Format lesen
 uint32_t AntBMS::readUint32LE(const uint8_t* data, int offset) const {
   return data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
 }
 
+
+// Hexadezimale Ausgabe für Debug
 void AntBMS::printHex(const uint8_t* data, int length) const {
   if (!debugMode_) return;
   
@@ -580,33 +594,37 @@ void AntBMS::printHex(const uint8_t* data, int length) const {
   Serial.println();
 }
 
+// Standardkommando erstellen und senden
 bool AntBMS::buildAndSendCommand(uint8_t functionCode, uint16_t address, uint8_t dataLength) {
+  // Datenarray für CRC-Berechnung (ohne Start- und Endbytes)
   uint8_t data[5] = {
     AntBMSProtocol::START2,
     functionCode,
-    (uint8_t)(address & 0xFF),
-    (uint8_t)(address >> 8),
+    (uint8_t)(address & 0xFF),        // Niedrigwertiges Byte der Adresse
+    (uint8_t)(address >> 8),          // Höherwertiges Byte der Adresse
     dataLength
   };
   
+  // CRC berechnen und in Low/High-Bytes aufteilen
   uint16_t crc = calculateCRC16_TX(data, 5);
   uint8_t crcLow = crc & 0xFF;
   uint8_t crcHigh = (crc >> 8) & 0xFF;
   
+  // Vollständiges Kommando zusammenstellen
   uint8_t command[10] = {
-    AntBMSProtocol::START1, AntBMSProtocol::START2,
+    AntBMSProtocol::START1, AntBMSProtocol::START2,       // Startbytes
     functionCode,
-    (uint8_t)(address & 0xFF), (uint8_t)(address >> 8),
+    (uint8_t)(address & 0xFF), (uint8_t)(address >> 8),   // Adresse
     dataLength,
-    crcLow, crcHigh,
-    AntBMSProtocol::END1, AntBMSProtocol::END2
+    crcLow, crcHigh,                                      // CRC-Prüfsumme
+    AntBMSProtocol::END1, AntBMSProtocol::END2            // Endbytes
   };
   
-  uint8_t response[256];
+  uint8_t response[256];    // Puffer für Antwort
   int responseLength = 0;
   
   if (sendCommand(command, 10, response, &responseLength)) {
-    // Determine which parser to use based on function code and address
+    // Bestimme welcher Parser verwendet werden soll basierend auf Funktionscode und Adresse
     if (functionCode == AntBMSProtocol::STATE) {
       return parseStateResponse(response, responseLength);
     } else if (functionCode == AntBMSProtocol::PARAM_READ) {
@@ -629,7 +647,7 @@ bool AntBMS::buildAndSendCommand(uint8_t functionCode, uint16_t address, uint8_t
       } else if (address == AntBMSProtocol::ADR_CON_SAVE){
         return parseSave(response, responseLength);
       } else if (address == AntBMSProtocol::ADR_F_RESET){
-        Serial.println("Factory Reset was successful!");
+        Serial.println("Werksreset wurde erfolgreich durchgeführt!");
         return true;
       } else if (address == AntBMSProtocol::ADR_BAL_ON){
         return parseAutoBalON(response, responseLength);
@@ -641,12 +659,13 @@ bool AntBMS::buildAndSendCommand(uint8_t functionCode, uint16_t address, uint8_t
   return false;
 }
 
-/// Anzahl der Zellen setten
+// Spezielles Kommando für Zellanzahl-Konfiguration
 bool AntBMS::buildAndSendCommandBMSCell(uint8_t functionCode, uint16_t address, uint8_t dataLength, uint8_t cell_num) {
 
   uint8_t response[256];
   int responseLength = 0;
 
+  // Datenarray für CRC-Berechnung (inklusive Zellanzahl)
   uint8_t data[7] = {
     AntBMSProtocol::START2,
     functionCode,
@@ -660,7 +679,7 @@ bool AntBMS::buildAndSendCommandBMSCell(uint8_t functionCode, uint16_t address, 
   uint8_t crcLow = crc & 0xFF;
   uint8_t crcHigh = (crc >> 8) & 0xFF;
   
-
+  // Vollständiges Kommando für Zellkonfiguration
   uint8_t commandCell[12] = {
     AntBMSProtocol::START1, AntBMSProtocol::START2,
     functionCode,
@@ -671,7 +690,7 @@ bool AntBMS::buildAndSendCommandBMSCell(uint8_t functionCode, uint16_t address, 
     AntBMSProtocol::END1, AntBMSProtocol::END2
   };
 
-  Serial.println("Funktioniert es?");
+  Serial.println("Sende Zellkonfiguration...");
 
   if (sendCommand(commandCell, 12, response, &responseLength)){
         return parseConfigureBMSCells(response, responseLength, cell_num);
@@ -679,15 +698,16 @@ bool AntBMS::buildAndSendCommandBMSCell(uint8_t functionCode, uint16_t address, 
   
 }
 
+// Kommando senden und auf Antwort warten
 bool AntBMS::sendCommand(const uint8_t* command, int cmdLength, uint8_t* response, int* respLength) {
   if (!serial_ || !connected_) return false;
   
-  // Clear pending data
+  // Lösche wartende Daten im Empfangspuffer
   while (serial_->available()) {
     serial_->read();
   }
   
-  // Send command
+  // Sende Kommando
   serial_->write(command, cmdLength);
   
   if (debugMode_) {
@@ -695,56 +715,59 @@ bool AntBMS::sendCommand(const uint8_t* command, int cmdLength, uint8_t* respons
     printHex(command, cmdLength);
   }
   
-  // Wait for response
+  // Warte auf Antwort
   rxIndex_ = 0;
   memset(rxBuffer_, 0, sizeof(rxBuffer_));
   unsigned long startTime = millis();
   bool responseEnded = false;
   
+  // Empfange Daten bis Timeout oder vollständige Antwort
   while (millis() - startTime < timeout_ && !responseEnded) {
     if (serial_->available() > 0) {
       rxBuffer_[rxIndex_] = serial_->read();
       rxIndex_++;
-      startTime = millis();
+      startTime = millis();         // Reset Timeout bei neuen Daten
       
       if (rxIndex_ >= sizeof(rxBuffer_)) {
-        if (debugMode_) Serial.println("Warning: Buffer overflow prevented");
+        if (debugMode_) Serial.println("Warnung: Pufferüberlauf verhindert");
         break;
       }
       
-      // Check for end of frame
+      // Prüfe auf Ende des Rahmens (AA 55)
       if (rxIndex_ >= 2 && rxBuffer_[rxIndex_-2] == AntBMSProtocol::END1 && 
           rxBuffer_[rxIndex_-1] == AntBMSProtocol::END2) {
         responseEnded = true;
       }
     }
     else if (rxIndex_ > 0 && millis() - startTime > 100) {
-      responseEnded = true;
+      responseEnded = true;       // Timeout für unvollständige Antworten
     }
   }
   
+  // Verarbeite empfangene Daten
   if (rxIndex_ > 0) {
     memcpy(response, rxBuffer_, rxIndex_);
     *respLength = rxIndex_;
     
     if (debugMode_) {
-      Serial.print("Received: ");
+      Serial.print("Empfangen: ");
       printHex(response, *respLength);
     }
     
     return validateCRC(response, *respLength);
   }
   
-  if (debugMode_) Serial.println("No response received");
+  if (debugMode_) Serial.println("Keine Antwort empfangen");
   return false;
 }
 
+// Framevalidierung - prüft Struktur und Länge
 bool AntBMS::validateFrame(const uint8_t* response, int length, int expectedMinLength) const {
   if (length < expectedMinLength || 
       response[0] != AntBMSProtocol::START1 || 
       response[1] != AntBMSProtocol::START2) {
     if (debugMode_) {
-      Serial.printf("Invalid frame: length=%d, header=0x%02X%02X\n", 
+      Serial.printf("Ungültiges Frame: Länge=%d, header=0x%02X%02X\n", 
                     length, response[0], response[1]);
     }
     return false;
@@ -753,7 +776,7 @@ bool AntBMS::validateFrame(const uint8_t* response, int length, int expectedMinL
   if (response[length-2] != AntBMSProtocol::END1 || 
       response[length-1] != AntBMSProtocol::END2) {
     if (debugMode_) {
-      Serial.printf("Invalid end markers: 0x%02X%02X (expected 0xAA55)\n", 
+      Serial.printf("Ungültige Endmarkierungen: 0x%02X%02X (erwartet 0xAA55)\n", 
                     response[length-2], response[length-1]);
     }
     return false;
@@ -762,6 +785,7 @@ bool AntBMS::validateFrame(const uint8_t* response, int length, int expectedMinL
   return true;
 }
 
+// CRC-Validierung für empfangene Daten
 bool AntBMS::validateCRC(const uint8_t* response, int length) const {
   if (length < 8) return false;
   
@@ -773,11 +797,11 @@ bool AntBMS::validateCRC(const uint8_t* response, int length) const {
   uint16_t receivedCRC = (receivedCRC_High << 8) | receivedCRC_Low;
   
   if (debugMode_) {
-    Serial.printf("Received CRC-16_RX: 0x%04X\n", receivedCRC);
+    Serial.printf("Empfangene CRC-16_RX: 0x%04X\n", receivedCRC);
   }
   
   if (calculatedCRC == receivedCRC) {
-    if (debugMode_) Serial.println("CRC-Check erfolgreich - CRC richtig");
+    if (debugMode_) Serial.println("CRC-Check erfolgreich - CRC korrekt");
     return true;
   } else {
     if (debugMode_) {
@@ -788,28 +812,32 @@ bool AntBMS::validateCRC(const uint8_t* response, int length) const {
   }
 }
 
-// Parser implementations
+// Parser-Implementierungen
+
+// Parse State Antwort
 bool AntBMS::parseStateResponse(const uint8_t* response, int length) {
   if (!validateFrame(response, length, 146)) return false;
   
   stateData_ = BMSStateData(); // Reset
   
   if (debugMode_) {
-    Serial.printf("Valid AntBMS state response: Cmd=0x%02X, DataLength=%d\n", 
+    Serial.printf("Gültige AntBMS Zustandsantwort: Cmd=0x%02X, Datalänge=%d\n", 
                   response[2], response[5]);
   }
   
+  // Anzahl der Zellen aus Byte 9 lesen
   int numCells =response[9];
   Serial.print("numCell ist: ");
   Serial.println(numCells);
-  // Parse cell voltages (Bytes 34-55)
+  
+  // Parse Zellspannungen (Bytes 34-55 bzw. je nach Zellanzahl länger oder kürzer)
   stateData_.numCells = numCells;
   for (int i = 0; i < numCells ; i++) {
     uint16_t rawVoltage = readUint16LE(response, 34 + i * 2);
-    stateData_.cellVoltages[i] = rawVoltage * 0.001;
+    stateData_.cellVoltages[i] = rawVoltage * 0.001;      // Umwandlung in Volt
   }
   
-  // Parse temperatures (Bytes 56-67)
+  // Parse Temperaturen (nach den Zellspannungen)
   stateData_.temperature_T1 = readUint16LE(response, 34 + numCells*2);
   stateData_.temperature_T2 = readUint16LE(response, 36 + numCells*2);
   stateData_.temperature_T3 = readUint16LE(response, 38 + numCells*2);
@@ -817,22 +845,22 @@ bool AntBMS::parseStateResponse(const uint8_t* response, int length) {
   stateData_.temperature_MOS = readUint16LE(response, 42 + numCells*2);
   stateData_.temperature_PCB = readUint16LE(response, 44 + numCells*2);
   
-  // Parse pack data
+  // Parse Gesamtbatterie-Daten
   stateData_.packVoltage = readUint16LE(response, 46 + numCells*2) * 0.01;
   stateData_.current = (int16_t)readUint16LE(response, 48 + numCells*2);
   stateData_.stateOfCharge = readUint16LE(response, 50 + numCells*2);
   
-  // Parse status
+  // Parse Systemstatus
   stateData_.balanceStatus = (response[53 + numCells*2] == 0x01);
   stateData_.chargeMOS = (response[54 + numCells*2] == 0x01);
   stateData_.dischargeMOS = (response[55 + numCells*2] == 0x01);
   
-  // Parse capacities
+  // Parse Kapazitäten (in Amperestunden)
   stateData_.physicalAH = readUint32LE(response, 58 + numCells*2) * 0.000001;
   stateData_.remainingAH = readUint32LE(response, 62 + numCells*2) * 0.000001;
   stateData_.runtimeSeconds = readUint32LE(response, 74 + numCells*2);
   
-  // Parse statistics
+  // Parse Spanungsgrenzen
   stateData_.unitMax = readUint16LE(response, 82 + numCells*2) * 0.001;
   stateData_.unitMin = readUint16LE(response, 86 + numCells*2) * 0.001;
   stateData_.totalCycles = readUint16LE(response, 88 + numCells*2);
@@ -846,14 +874,15 @@ bool AntBMS::parseStateResponse(const uint8_t* response, int length) {
   return true;
 }
 
+// Parse Spannungsparameter-Antwort
 bool AntBMS::parseVoltageParams(const uint8_t* response, int length) {
   if (!validateFrame(response, length, 68)) return false;
   
-  voltageParams_ = BMSVoltageParams(); // Reset
+  voltageParams_ = BMSVoltageParams();        // Zurücksetzen
   
-  // Parse protection parameters
-  voltageParams_.cellOVProt = readUint16LE(response, 6) * 0.001;      ///
-  voltageParams_.cellOVRec = readUint16LE(response, 8) * 0.001;       ////
+  // Parse Schutzparameter (alle Werte in Volt)
+  voltageParams_.cellOVProt = readUint16LE(response, 6) * 0.001;     
+  voltageParams_.cellOVRec = readUint16LE(response, 8) * 0.001;       
   voltageParams_.cellOVProt2 = readUint16LE(response, 10) * 0.001;
   voltageParams_.cellOVRec2 = readUint16LE(response, 12) * 0.001;
   voltageParams_.packOVProt = readUint16LE(response, 14) * 0.1;
@@ -869,7 +898,7 @@ bool AntBMS::parseVoltageParams(const uint8_t* response, int length) {
   voltageParams_.cellDiffProt = readUint16LE(response, 30) * 0.001;
   voltageParams_.cellDiffRec = readUint16LE(response, 32) * 0.001;
   
-  // Parse warning parameters
+  // Parse Warnparameter
   voltageParams_.cellOVWarn = readUint16LE(response, 38) * 0.001;
   voltageParams_.cellOVWarnRec = readUint16LE(response, 40) * 0.001;
   voltageParams_.packOVWarn = readUint16LE(response, 42) * 0.1;
@@ -885,12 +914,13 @@ bool AntBMS::parseVoltageParams(const uint8_t* response, int length) {
   return true;
 }
 
+// Parse Temperaturparameter-Antwort
 bool AntBMS::parseTemperatureParams(const uint8_t* response, int length) {
   if (!validateFrame(response, length, 60)) return false;
   
   temperatureParams_ = BMSTemperatureParams(); // Reset
   
-  // Parse protection parameters
+  // Parse Schutzparameter (alle Werte in Grad Celsius)
   temperatureParams_.chgHTProt = readUint16LE(response, 6);
   temperatureParams_.chgHTRec = readUint16LE(response, 8);
   temperatureParams_.disCHGHTProt = readUint16LE(response, 10);
@@ -898,12 +928,13 @@ bool AntBMS::parseTemperatureParams(const uint8_t* response, int length) {
   temperatureParams_.mosHTProt = readUint16LE(response, 14);
   temperatureParams_.mosHTRec = readUint16LE(response, 16);
   
+  // Kälteschutz (kann negative Werte haben)
   temperatureParams_.chgLTProt = (int16_t)readUint16LE(response, 18);
   temperatureParams_.chgLTRec = readUint16LE(response, 20);
   temperatureParams_.disCHGLTProt = (int16_t)readUint16LE(response, 22);
   temperatureParams_.disCHGLTRec = (int16_t)readUint16LE(response, 24);
   
-  // Parse warning parameters
+  // Parse Warnparameter
   temperatureParams_.chgHTWarn = readUint16LE(response, 30);
   temperatureParams_.chgHTWarnRec = readUint16LE(response, 32);
   temperatureParams_.disCHGHTWarn = readUint16LE(response, 34);
@@ -919,12 +950,13 @@ bool AntBMS::parseTemperatureParams(const uint8_t* response, int length) {
   return true;
 }
 
+// Parse Stromparameter-Antwort
 bool AntBMS::parseCurrentParams(const uint8_t* response, int length) {
   if (!validateFrame(response, length, 48)) return false;
   
-  currentParams_ = BMSCurrentParams(); // Reset
+  currentParams_ = BMSCurrentParams();        // Zurücksetzen
   
-  // Parse protection parameters
+  // Parse Schutzparameter
   currentParams_.chgOCProt = readUint16LE(response, 6) * 0.1;
   currentParams_.chgOCDelay = readUint16LE(response, 8);
   currentParams_.disCHGOCProt = readUint16LE(response, 10) * 0.1;
@@ -934,13 +966,13 @@ bool AntBMS::parseCurrentParams(const uint8_t* response, int length) {
   currentParams_.scProt = readUint16LE(response, 18);
   currentParams_.scDelay = readUint16LE(response, 20);
   
-  // Parse warning parameters
+  // Parse Warnparameter
   currentParams_.chgOCWarn = readUint16LE(response, 26) * 0.1;
   currentParams_.chgOCWarnRec = readUint16LE(response, 28) * 0.1;
   currentParams_.disCHGOCWarn = readUint16LE(response, 30) * 0.1;
   currentParams_.disCHGOCWarnRec = readUint16LE(response, 32) * 0.1;
   
-  // Parse SOC parameters
+  // Parse SOC-Parameter (Ladezustand in Prozent)
   currentParams_.socLowLV1Warn = readUint16LE(response, 34);
   currentParams_.socLowLV2Warn = readUint16LE(response, 36);
   
@@ -948,34 +980,36 @@ bool AntBMS::parseCurrentParams(const uint8_t* response, int length) {
   return true;
 }
 
+// Parse Balancing-Parameter-Antwort
 bool AntBMS::parseBalanceParams(const uint8_t* response, int length) {
   if (!validateFrame(response, length, 28)) return false;
   
-  balanceParams_ = BMSBalanceParams(); // Reset
+  balanceParams_ = BMSBalanceParams();          // Reset
   
-  balanceParams_.balLimitV = readUint16LE(response, 6) * 0.001;
-  balanceParams_.balStartV = readUint16LE(response, 8) * 0.001;
-  balanceParams_.balDiffOn = readUint16LE(response, 10) * 0.001;
-  balanceParams_.balDiffOff = readUint16LE(response, 12) * 0.001;
-  balanceParams_.balCur = readUint16LE(response, 14);
-  balanceParams_.balChgCur = readUint16LE(response, 16);
+  // Parse Balancing-Parameter
+  balanceParams_.balLimitV = readUint16LE(response, 6) * 0.001;       // Grenzspannung in Volt
+  balanceParams_.balStartV = readUint16LE(response, 8) * 0.001;       // Startspannung
+  balanceParams_.balDiffOn = readUint16LE(response, 10) * 0.001;      // Einschalt-Differenz
+  balanceParams_.balDiffOff = readUint16LE(response, 12) * 0.001;     // Ausschalt-Differenz
+  balanceParams_.balCur = readUint16LE(response, 14);                 // Balancing-Strom
+  balanceParams_.balChgCur = readUint16LE(response, 16);              // Lade-Grenzstrom
   
   balanceParams_.valid = true;
   return true;
 }
 
-// Parse SET_CONTROL
+// Parse Steuerungskommando-Antwort
 bool AntBMS::parseSetConResponse(const uint8_t* response, int length, const char input) {
   if (!validateFrame(response, length, 12)) return false;
   
   if (debugMode_) {
-    Serial.printf("Valid AntBMS SetControl response: Cmd=0x%02X, DataLength=%d\n", 
+    Serial.printf("Gültige AntBMS Steuerungsantwort: Cmd=0x%02X, Datalänge=%d\n", 
                   response[2], response[5]);
   }
   
-  // Check Frame
+  // Prüfe Framestruktur für erfolgreiche Steuerung
   if(response[2] == 0x61 && response[5] == 0x02 && response[6] == 0x01){
-    Serial.println("Validate Set Control was successful.");
+    Serial.println("Steuerungskommando erfolgreich validiert.");
     return true;
   }
   
@@ -983,17 +1017,18 @@ bool AntBMS::parseSetConResponse(const uint8_t* response, int length, const char
   return true;
 }
 
+// Parse Zellkonfiguration-Antwort
 bool AntBMS::parseConfigureBMSCells(const uint8_t* response, int length, uint16_t cell_num){
   if (!validateFrame(response, length, 12)) return false;
   
   if (debugMode_) {
-    Serial.printf("Configure BMS Cell response: Cmd=0x%02X, DataLength=%d\n", 
+    Serial.printf("Zellkonfiguration-Antwort: Cmd=0x%02X, Datalänge=%d\n", 
                   response[2], response[5]);
   }
   
-  // Check Frame
+  // Prüfe erfolgreiche Zellkonfiguration
   if(response[2] == 0x42 && response[5] == 0x02 && response[6] == (uint8_t) cell_num && response[7] == 0x00){
-    Serial.println("Configure BMS Cell was succesful.");
+    Serial.println("BMS-Zellkonfiguration war erfolgreich.");
     return true;
   }
   
@@ -1001,17 +1036,18 @@ bool AntBMS::parseConfigureBMSCells(const uint8_t* response, int length, uint16_
   return true;
 }
 
+// Parse Speichern-Antwort
 bool AntBMS::parseSave(const uint8_t* response, int length){
   if (!validateFrame(response, length, 12)) return false;
   
   if (debugMode_) {
-    Serial.printf("Settings have been saved : Cmd=0x%02X, DataLength=%d\n", 
+    Serial.printf("Einstellungen wurden gespeichert: Cmd=0x%02X, Datalänge=%d\n", 
                   response[2], response[5]);
   }
   
-  // Check Frame
+  // Prüfe erfolgreiche Speicherung
   if(response[2] == 0x61 && response[5] == 0x02 && response[6] == 0x01 && response[7] == 0x00){
-    Serial.println("AutoBalance ist eingeschaltet!");
+    Serial.println("Einstellungen erfolgreich gespeichert!");
     return true;
   }
   
@@ -1019,16 +1055,16 @@ bool AntBMS::parseSave(const uint8_t* response, int length){
   return true;
 }
 
-// Parse für AutoBalance ON
+// Parse Balancing EIN-Antwort
 bool AntBMS::parseAutoBalON(const uint8_t* response, int length){
   if (!validateFrame(response, length, 12)) return false;
   
   if (debugMode_) {
-    Serial.printf("AutoBalanceOFF : Cmd=0x%02X, DataLength=%d\n", 
+    Serial.printf("AutoBalancing EIN: Cmd=0x%02X, Datenlänge=%d\n", 
                   response[2], response[5]);
   }
   
-  // Check Frame
+  // Prüfe erfolgreiche Aktivierung
   if(response[2] == 0x61 && response[5] == 0x02 && response[6] == 0x01 && response[7] == 0x00){
     Serial.println("AutoBalance ist eingeschaltet!");
     return true;
@@ -1038,16 +1074,16 @@ bool AntBMS::parseAutoBalON(const uint8_t* response, int length){
   return true;
 }
 
-// Parse für AutoBalance OFF
+// Parse Balancing AUS-Antwort
 bool AntBMS::parseAutoBalOFF(const uint8_t* response, int length){
   if (!validateFrame(response, length, 12)) return false;
   
   if (debugMode_) {
-    Serial.printf("AutoBalanceOFF : Cmd=0x%02X, DataLength=%d\n", 
+    Serial.printf("AutoBalancing AUS: Cmd=0x%02X, Datalänge=%d\n", 
                   response[2], response[5]);
   }
   
-  // Check Frame
+  // Prüfe erfolgreiche Deaktivierung
   if(response[2] == 0x61 && response[5] == 0x02 && response[6] == 0x01 && response[7] == 0x00){
     Serial.println("AutoBalance ist ausgeschaltet!");
     return true;
@@ -1082,15 +1118,14 @@ void AntBMS::configureBMSCells() {
         Serial.println(cell_num);
         
         if(10 <= cell_num && cell_num <= 24) {
-
-            //Debug-Ausgabe der Hexwerte
+            // Debug-Ausgabe der Hexwerte
             Serial.print("Dezimal: ");
             Serial.print(cell_num);
             Serial.print(" -> Hex: 0x");
             if(cell_num < 0x10) Serial.print("0");
             Serial.print(cell_num, HEX);
-            // Serial.print(" (High: 0x");
             
+            // Sende Zellkonfigurationskommando
             // 7E A1 22 9A 00 02 cell_num_low cell_num_high CRC_L CRC_H AA 55
             bool success = buildAndSendCommandBMSCell(AntBMSProtocol::PARAM_SET, 
                                             AntBMSProtocol::ADR_CELL_NUM,
@@ -1101,10 +1136,11 @@ void AntBMS::configureBMSCells() {
             Serial.print(cell_num);
             Serial.println(" gesetzt.");                                
 
+            // Speichere die Einstellungen
             if(SaveApply()){
-              Serial.println("Settings could be saved!");
+              Serial.println("Einstellungen konnten gespeichert werden!");
             } else {
-              Serial.println("Settings could not be saved!");
+              Serial.println("Einstellungen konnten nicht gespeichert werden!");
             }
             
         } else if(cell_num < 10 || cell_num > 24) {
@@ -1115,6 +1151,7 @@ void AntBMS::configureBMSCells() {
             const int max_retries = 3;
             bool valid_input = false;
             
+            // Bis zu 3 Wiederholungsversuche
             while(retry_count < max_retries && !valid_input) {
                 Serial.print("Versuch ");
                 Serial.print(retry_count + 1);
@@ -1124,7 +1161,7 @@ void AntBMS::configureBMSCells() {
                 
                 // Warten auf Eingabe
                 while(Serial.available() == 0) {
-                    delay(10); // Kurze Pause, um CPU-Last zu reduzieren
+                    delay(10); 
                 }
                 
                 cell_num = Serial.parseInt();
@@ -1143,34 +1180,32 @@ void AntBMS::configureBMSCells() {
                     Serial.print(" -> Hex: 0x");
                     if(cell_num_hex < 0x10) Serial.print("0");
                     Serial.print(cell_num_hex, HEX);
-                    // Serial.print(" (High: 0x");
-                  
                     
-                    // 7E A1 22 9A 00 02 cell_num_low cell_num_high CRC_L CRC_H AA 55
                     Serial.print("Zellanzahl erfolgreich auf ");
                     Serial.print(cell_num);
                     Serial.println(" gesetzt.");
                     valid_input = true;
 
-                    // 7E A1 22 9A 00 02 cell_num_low cell_num_high CRC_L CRC_H AA 55
+                    // Sende Zellkonfigurationskommando
                     bool success = buildAndSendCommandBMSCell(AntBMSProtocol::PARAM_SET, 
                                             AntBMSProtocol::ADR_CELL_NUM,
                                             AntBMSProtocol::LENGTH_CELL_NUM, cell_num_hex);
             
                     if(success){
-                      Serial.println("TEST.");
+                      Serial.println("Konfiguration erfolgreich.");
                     } else {
-                      Serial.println("nicht erfolgt!");
+                      Serial.println("Konfiguration nicht erfolgreich!");
                     }
                     
                     Serial.print("Zellanzahl erfolgreich auf ");
                     Serial.print(cell_num);
-                    Serial.println(" gesetzt.");                                
+                    Serial.println(" gesetzt.");    
 
+                    // Speichere die Einstellungen
                     if(SaveApply()){
-                      Serial.println("Settings could be saved!");
+                      Serial.println("Einstellungen konnten gespeichert werden!");
                     } else {
-                      Serial.println("Settings could not be saved!");
+                      Serial.println("Einstellungen konnten nicht gespeichert werden!");
                     }
                 } else {
                     retry_count++;
@@ -1189,7 +1224,7 @@ void AntBMS::configureBMSCells() {
     } else if(input == 'n' || input == 'N') {
         Serial.println("Das BMS hat folgende Schutzparameter:");
         
-        // Read all parameters
+        // Lese alle Parameter und zeige sie an
         if (readAllParams()) {
             printAllData();
             checkAllParamsSafety();
@@ -1197,16 +1232,16 @@ void AntBMS::configureBMSCells() {
     }
 }
 
+/////// Ausgabemethoden-Implementierung ///////
 
-
-// Print methods implementation
+// Ausgabe der Zustandsdaten
 void AntBMS::printStateData() const {
   if (!stateData_.valid) {
-    Serial.println("No valid state data available");
+    Serial.println("Keine gültigen Zustandsdaten verfügbar");
     return;
   }
   
-  Serial.println("\n=========== AntBMS STATE DATA ===========");
+  Serial.println("\n=========== AntBMS STATUS-INFORMATIONEN ===========");
   Serial.printf("Pack Voltage: %.2f V\n", stateData_.packVoltage);
   Serial.printf("Current: %.2f A\n", stateData_.current);
   Serial.printf("Power: %.2f W\n", stateData_.packVoltage * stateData_.current);
@@ -1218,7 +1253,7 @@ void AntBMS::printStateData() const {
   Serial.print("stateData_numCells = ");
   Serial.println(stateData_.numCells);
   for (int i = 0; i < stateData_.numCells; i++) {
-    delay(500);
+    delay(500);     // Kurze Verzögerung für bessere Lesbarkeit
     Serial.printf("  Cell %2d: %.3f V\n", i + 1, stateData_.cellVoltages[i]);
   }
   
@@ -1234,6 +1269,7 @@ void AntBMS::printStateData() const {
   Serial.println("========================================\n");
 }
 
+// Ausgabe der Spannungsparameter
 void AntBMS::printVoltageParams() const {
   if (!voltageParams_.valid) {
     Serial.println("No valid voltage parameters available");
@@ -1281,7 +1317,7 @@ void AntBMS::printVoltageParams() const {
   Serial.println("==============================================\n");
 }
 
-
+// Ausgabe der Temperaturparameter
 void AntBMS::printTemperatureParams() const {
   if (!temperatureParams_.valid) {
     Serial.println("No valid temperature parameters available");
@@ -1325,6 +1361,7 @@ void AntBMS::printTemperatureParams() const {
   Serial.println("==============================================\n");
 }
 
+// Ausgabe der Stromparameter
 void AntBMS::printCurrentParams() const {
   if (!currentParams_.valid) {
     Serial.println("No valid current parameters available");
@@ -1365,6 +1402,7 @@ void AntBMS::printCurrentParams() const {
   Serial.println("==========================================\n");
 }
 
+// Ausgabe der Balancing-Parameter
 void AntBMS::printBalanceParams() const {
   if (!balanceParams_.valid) {
     Serial.println("No valid balance parameters available");
@@ -1391,6 +1429,7 @@ void AntBMS::printBalanceParams() const {
   Serial.println("==============================================\n");
 }
 
+// Ausgabe aller Daten
 void AntBMS::printAllData() const {
   printStateData();
   printVoltageParams();
@@ -1399,68 +1438,79 @@ void AntBMS::printAllData() const {
   printBalanceParams();
 }
 
-// Safety check implementations
+///// Sicherheitsprüfungen-Implementierung /////
+
+// Prüfung der Spannungsparameter auf sichere Bereiche
 bool AntBMS::checkVoltageParamsSafety() const {
   if (!voltageParams_.valid) return false;
   
   bool safe = true;
-  
+  // Prüfe Überspannungsschutz (typisch 4.0-4.3V für Li-Ion)
   if (voltageParams_.cellOVProt > 4.3 || voltageParams_.cellOVProt < 4.0) {
-    Serial.printf("⚠️  WARNING: Unusual CellOVProt: %.3fV\n", voltageParams_.cellOVProt);
+    Serial.printf("WARNUNG: Ungewöhnlicher CellOVProt: %.3fV\n", voltageParams_.cellOVProt);
     safe = false;
   }
   
+  // Prüfe Unterspannungsschutz (typisch 2.5-3.2V für Li-Ion)
   if (voltageParams_.cellUVProt < 2.5 || voltageParams_.cellUVProt > 3.2) {
-    Serial.printf("⚠️  WARNING: Unusual CellUVProt: %.3fV\n", voltageParams_.cellUVProt);
+    Serial.printf("WARNUNG: Ungewöhnlicher CellUVProt: %.3fV\n", voltageParams_.cellUVProt);
     safe = false;
   }
   
-  if (safe) Serial.println("✅ Voltage parameters are within safe range");
+  // Spannungsparameter liegen im sicheren Bereich
+  if (safe) Serial.println("Voltage parameters are within safe range");
   return safe;
 }
 
+// Prüfung der Temperaturparameter
 bool AntBMS::checkTemperatureParamsSafety() const {
   if (!temperatureParams_.valid) return false;
   
   bool safe = true;
-  
+
+  // Prüfe Überhitzungsschutz (typisch 40-70°C)
   if (temperatureParams_.chgHTProt > 70 || temperatureParams_.chgHTProt < 40) {
-    Serial.printf("⚠️  WARNING: Unusual CHGHTProt: %.0f°C\n", temperatureParams_.chgHTProt);
+    Serial.printf("WARNUNG: Ungewöhnlicher CHGHTProt: %.0f°C\n", temperatureParams_.chgHTProt);
     safe = false;
   }
   
-  if (safe) Serial.println("✅ Temperature parameters are within safe range");
+  if (safe) Serial.println("Temperaturparameter liegen im sicheren Bereich");
   return safe;
 }
 
+// Prüfung der Stromparameter
 bool AntBMS::checkCurrentParamsSafety() const {
   if (!currentParams_.valid) return false;
   
   bool safe = true;
   
+  // Prüfe Ladestromschutz (typisch 10-200A je nach Batterie)
   if (currentParams_.chgOCProt > 200 || currentParams_.chgOCProt < 10) {
-    Serial.printf("⚠️  WARNING: Unusual CHGOCProt: %.1fA\n", currentParams_.chgOCProt);
+    Serial.printf(" WARNUNG: Ungewöhnlicher CHGOCProt: %.1fA\n", currentParams_.chgOCProt);
     safe = false;
   }
   
-  if (safe) Serial.println("✅ Current parameters are within safe range");
+  if (safe) Serial.println("Stromparameter liegen im sicheren Bereich");
   return safe;
 }
 
+// Prüfung der Balancing-Parameter
 bool AntBMS::checkBalanceParamsSafety() const {
   if (!balanceParams_.valid) return false;
   
   bool safe = true;
   
+  // Prüfe Balancing-Grenzspannung (typisch 4.0-4.3V)
   if (balanceParams_.balLimitV > 4.3 || balanceParams_.balLimitV < 4.0) {
-    Serial.printf("⚠️  WARNING: Unusual BalLimitV: %.3fV\n", balanceParams_.balLimitV);
+    Serial.printf("WARNUNG: Ungewöhnlicher BalLimitV: %.3fV\n", balanceParams_.balLimitV);
     safe = false;
   }
   
-  if (safe) Serial.println("✅ Balance parameters are within safe range");
+  if (safe) Serial.println("Balancing-Parameter liegen im sicheren Bereich");
   return safe;
 }
 
+// Prüfung aller Parameter auf Sicherheit
 bool AntBMS::checkAllParamsSafety() const {
   bool allSafe = true;
   allSafe &= checkVoltageParamsSafety();
@@ -1472,38 +1522,49 @@ bool AntBMS::checkAllParamsSafety() const {
 
 #endif // ANTBMS_H
 
+// =============================================================================
+// HAUPTPROGRAMM - Setup und Loop
+// =============================================================================
 
-// Create AntBMS instance
-AntBMS bms(20, 21); // RX Pin 20, TX Pin 21
+// Erstelle AntBMS-Instanz mit RX Pin 20, TX Pin 21
+AntBMS bms(20, 21); 
 
 void setup() {
-  Serial.begin(115200);
-  
-  // Initialize BMS communication
+  Serial.begin(115200); 
+
+ // Warten auf Eingabe
+  while(Serial.available() == 0) {
+        delay(10);
+  }
+ 
+
+  // Initialisiere BMS-Kommunikation
   if (bms.begin()) {
-    bms.setDebugMode(true);
+    // bms.setDebugMode(true);     // Aktiviere Debug-Modus für detaillierte Ausgaben
     Serial.println("BMS erfolgreich initialisiert.");
-    //bms.setDebugMode(true);
+  
   } else {
     Serial.println("BMS Initialisierung fehlgeschlagen.");
   }
 
-  // // Read all parameters
-  // if (bms.readAllParams()) {
-  //   bms.printAllData();
-  //   bms.checkAllParamsSafety();
-  // }
 
-  // // Anzahl der Batteriezellen setten 
-  // bms.configureBMSCells();
+  // Read all parameters
+  if (bms.readAllParams()) {
+    bms.printAllData();
+    bms.checkAllParamsSafety();
+  }
+
+  // Anzahl der Batteriezellen setten 
+  bms.configureBMSCells();
 
 }
 
 
 void loop() {
 
-  char input = Serial.read();
   Serial.print("Eingabe war: ");
+  Serial.flush(); // Puffer leeren, um alte Eingaben zu entfernen
+  char input = Serial.read();
   Serial.println(input);
  
   // Warten auf Eingabe
@@ -1512,24 +1573,26 @@ void loop() {
   }
  
   if (input == 'r' || 'R'){
-       Serial.println("Soll das BMS auf Werkeinstellungen zurückgesetzt werden?");
-       Serial.println("Wenn ja, bitte 'y' eingeben sonstige Eingaben werden nicht berücksichtigt.");
+      Serial.println("Soll das BMS auf Werkeinstellungen zurückgesetzt werden?");
+      Serial.print("Eingabe war: ");
+      Serial.println("Wenn ja, bitte 'y' eingeben sonstige Eingaben werden nicht berücksichtigt.");
+      
       
       char input2 = Serial.read();
-      Serial.print("Eingabe war: ");
       Serial.println(input2);
       if(input2 == 'y' || input2 == 'Y') {
           
-          // Factory Reset
+          // Führe Werksreset durch
           bms.FactoryReset();
 
           delay(500);
 
-          // Anzahl der Batteriezellen setten 
+          // Konfiguriere Anzahl der Batteriezellen neu
           bms.configureBMSCells(); 
       }
 
   } else if(input == 'b' || 'B'){
+       // Balancing-Zustand ändern
        Serial.println("Soll das Balancing-Zustand geändert werden?");
        Serial.println("Wenn ja, bitte 'y' eingeben sonstige Eingaben werden nicht berücksichtigt.");
       
@@ -1553,10 +1616,7 @@ void loop() {
 
   } 
 
- 
-
-
-  // Read state data
+  // Lese aktuelle Zustandsdaten vom BMS
   if (bms.readStateData()) {
     bms.printStateData();
   }
