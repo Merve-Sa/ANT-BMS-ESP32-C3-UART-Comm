@@ -1,99 +1,113 @@
 # ANT-BMS-ESP32-C3-UART-Comm
-Reverse engineering and implementation of UART communication between Battery Management Systems (BMS) and ESP32-C3-Mini microcontrollers with CAN-Bus integration.
+
+Reverse engineering and implementation of UART communication between ANT Battery Management Systems (BMS) and ESP32-C3-Mini microcontrollers with comprehensive protocol analysis and implementation.
+
+## Project Overview
+
+This project provides a complete solution for communicating with ANT-BMS systems using ESP32-C3-Mini microcontrollers, featuring both UART and Modbus protocol implementations, detailed protocol reverse engineering, and practical hardware integration examples.
 
 ## Project Structure
 
 ```
-BMS-ESP32-Communication/
-├── firmware/
-│   ├── src/
-│   ├── include/
-│   ├── lib/
-│   └── platformio.ini
-├── hardware/
-│   ├── schematics/
-│   └── datasheets/
-├── docs/
-│   ├── protocol-analysis/
-│   ├── register-tables/
-│   └── setup-guide/
+ANT-BMS-ESP32-C3-UART-Comm/
+├── code/
+│   ├── checksum/           # CRC validation utilities
+│   ├── modbus/            # Modbus protocol implementation
+│   └── uart/              # UART protocol implementation
 ├── data/
-│   ├── protocol-captures/
-│   └── test-results/
-├── tools/
-│   └── scripts/
-└── examples/
-    ├── uart-basic/
-    ├── modbus/
-    └── can-bridge/
+│   ├── protocol-captures/ # Raw protocol data captures
+│   └── test-results/      # Validation and test data
+├── docs/
+│   ├── protocol-analysis/ # Reverse engineering documentation
+│   ├── register-tables/   # BMS register mappings
+├── hardware/
+│   ├── datasheets/       # Component datasheets
+│   └── schematics/       # Circuit diagrams
 ```
 
-## Hardware Requirements
 
-- ESP32-C3-Mini development board
-- ANT-BMS (10-24 cell configuration)
-- VESC motor controller
-- 11x 1kΩ resistors (battery simulation)
-- DC power supply
-    ### Circuit with resistors
 
-<div align="center">
-
-<img src="hardware/schematics/Gesamtschaltung.png" alt="Circuit Schematic" width="600">
-</div>
 
 ## Quick Start
 
+###  Clone the Repository
 ```bash
-git clone https://github.com/Merve-Sa/BMS-ESP32-Communication.git
-cd BMS-ESP32-Communication/firmware
-pio run --target upload
+git clone https://github.com/Merve-Sa/ANT-BMS-ESP32-C3-UART-Comm.git
+cd ANT-BMS-ESP32-C3-UART-Comm
 ```
+
+
+
+
 
 ## Key Features
 
-- UART/Modbus protocol implementation for BMS
-- CAN-Bus integration with VESC controllers
-- Complete protocol reverse engineering documentation
-- Battery cell simulation circuits
-- Register table mapping
+### Protocol Implementation
+- Complete UART and Modbus protocol stacks
+- Robust error handling and checksum validation
+- Comprehensive register mapping and documentation
+- Real-time data acquisition from BMS
 
-## Usage Example
+### Hardware Integration
+- ESP32-C3-Mini optimized firmware
+- Modular hardware design
 
-```cpp
-#include "bms_communication.h"
+### Documentation
+- Detailed reverse engineering analysis
+- Protocol capture and analysis tools
+- Complete register tables and command references
 
-BMSInterface bms(Serial1);
-bms.begin(19200);
 
-// Read cell voltages
-auto voltages = bms.readCellVoltages();
-float totalVoltage = bms.readTotalVoltage();
+
+## Documentation Structure
+
+### Protocol Analysis (`docs/protocol-analysis/`)
+- **UART Analysis**: Complete packet structure and command documentation
+- **Modbus Analysis**: Register mapping and function code implementation
+
+### Register Tables (`docs/register-tables/`)
+- Complete BMS register documentation
+- Address mappings for all supported parameters
+- Data format specifications
+
+## Development Tools
+
+### Checksum Validation (`code/checksum/`)
+CRC calculation and validation utilities for protocol development:
+```python
+python antbms_crc_check.py --input <hex_data> --validate
 ```
 
-## Documentation
 
-- **docs/protocol-analysis/**: Reverse engineering findings
-- **docs/register-tables/**: BMS register documentation
-- **docs/setup-guide/**: Hardware setup instructions
-Academic Citation
+
+## Academic Citation
+
 If you use this project in academic research, please cite:
-Sağlam, M. (2025). Reverse Engineering und Implementierung der UART-Kommunikation 
-zwischen BMS und ESP32-C3-Mini. Master's Thesis, Rheinland-Pfälzische Technische 
+
+```
+Sağlam, M. (2025). Reverse Engineering und Implementierung der UART-Kommunikation
+zwischen BMS und ESP32-C3-Mini. Master's Thesis, Rheinland-Pfälzische Technische
 Universität Kaiserslautern-Landau.
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contact and Support
+
+**Author**: Merve Sağlam  
+**Institution**: Rheinland-Pfälzische Technische Universität Kaiserslautern-Landau  
+**Email**: msaglam@rptu.de
+
 For questions, issues, or contributions:
-
-Create an issue on GitHub
-Contact: [msaglam@rptu.de]
-
+- Create an issue on GitHub
+- Email the author for academic inquiries
+- Check the documentation in `docs/` for detailed information
 
 ## Acknowledgments
 
-Rheinland-Pfälzische Technische Universität Kaiserslautern-Landau
-- Supervisor: Prof. Dr.-Ing. Stefan Götz
-- Advisor: Dipl. Ing. Max Köhler
-## License
+- **Institution**: Rheinland-Pfälzische Technische Universität Kaiserslautern-Landau
 
-MIT License
+
+---
